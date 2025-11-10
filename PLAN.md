@@ -23,7 +23,7 @@ A location-tinted clicker/crafter: the map is divided into small cells, you harv
 - [x] delete everything in `src/main.ts`
 - [x] render a basic Leaflet map centered on the classroom
 - [x] show a player marker
-- [ ] draw a grid that covers the viewport
+- [x] draw a grid that covers the viewport
 - [ ] deterministically decide which cells contain a token
 - [ ] restrict interactions to “nearby” cells
 - [ ] merge two tokens of the same value into the next tier
