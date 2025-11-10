@@ -28,10 +28,33 @@ html, body {
   image-rendering: pixelated;
 }
 
+/* tokens */
 .token-marker {
   display: grid;
   place-items: center;
   font-size: 14px;
   line-height: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.token-marker.token-far {
+  opacity: 0.35;
+}
+
+/* token numbers that are always visible */
+.token-label {
+  font:
+    700 12px/1 system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Arial,
+    sans-serif;
+  color: #111;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.95);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+.token-label.token-far {
+  opacity: 0.35;
 }

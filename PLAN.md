@@ -25,5 +25,5 @@ A location-tinted clicker/crafter: the map is divided into small cells, you harv
 - [x] show a player marker
 - [x] draw a grid that covers the viewport
 - [x] deterministically decide which cells contain a token
-- [ ] restrict interactions to “nearby” cells
+- [x] restrict interactions to “nearby” cells
 - [ ] merge two tokens of the same value into the next tier
