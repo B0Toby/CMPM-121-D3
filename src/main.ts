@@ -3,13 +3,14 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 
-// keep these helpers from the starter kit
 import "./_leafletWorkaround.ts";
 import luck from "./_luck.ts";
 
 const CENTER = { lat: 36.997936938057016, lng: -122.05703507501151 };
 const CELL_DEG = 1e-4;
-const ORIGIN = CENTER; // use the classroom as grid origin for D3.a
+const ORIGIN = CENTER;
+
+const INTERACT_STEPS = 3; // Chebyshev distance in cells
 
 function ensureContainer(): HTMLElement {
   let el = document.getElementById("map") ??
@@ -21,6 +22,16 @@ function ensureContainer(): HTMLElement {
     document.body.appendChild(el);
   }
   return el;
+}
+
+function ensureHUD(): HTMLDivElement {
+  let hud = document.getElementById("hud") as HTMLDivElement | null;
+  if (!hud) {
+    hud = document.createElement("div");
+    hud.id = "hud";
+    document.body.appendChild(hud);
+  }
+  return hud;
 }
 
 function cellBounds(i: number, j: number): L.LatLngBoundsExpression {
@@ -37,53 +48,95 @@ function cellCenter(i: number, j: number): [number, number] {
 }
 
 /* ---------- deterministic token generation ---------- */
-function tokenValue(i: number, j: number): number {
-  // tweak thresholds for density; deterministic per (i,j)
+function baseToken(i: number, j: number): number {
   const r = luck(`spawn:${i},${j}`);
-  if (r < 0.15) return 2; // 15%
-  if (r < 0.20) return 4; // 5%
-  if (r < 0.22) return 8; // 2%
+  if (r < 0.15) return 2;
+  if (r < 0.20) return 4;
+  if (r < 0.22) return 8;
   return 0;
 }
 
-/* ---------- “nearby” helper (player stays at origin in this step) ---------- */
-const INTERACT_STEPS = 3; // Chebyshev distance in cell steps
+/* ---------- gameplay state (only store cells that changed) ---------- */
+type Key = string;
+const key = (i: number, j: number) => `${i},${j}`;
+const modified = new Map<Key, number>(); // 0 means emptied by pickup
+let held: number | null = null;
+
+function getValue(i: number, j: number): number {
+  const k = key(i, j);
+  return modified.has(k) ? modified.get(k)! : baseToken(i, j);
+}
+function setValue(i: number, j: number, v: number) {
+  modified.set(key(i, j), v);
+}
+
+/* ---------- proximity ---------- */
 function isNear(i: number, j: number): boolean {
   return Math.max(Math.abs(i), Math.abs(j)) <= INTERACT_STEPS;
 }
 
+/* ---------- interaction ---------- */
+function onCellClick(
+  i: number,
+  j: number,
+  hud: HTMLDivElement,
+  redraw: () => void,
+) {
+  if (!isNear(i, j)) return;
+
+  const cur = getValue(i, j);
+
+  if (held === null) {
+    if (cur > 0) {
+      held = cur; // pick up
+      setValue(i, j, 0); // remove from cell
+    }
+  } else {
+    if (cur === held && cur > 0) {
+      setValue(i, j, held * 2); // merge into the cell
+      held = null; // hand becomes empty
+    }
+  }
+
+  hud.textContent = `Holding: ${
+    held ?? "—"
+  }  •  Click matching nearby values to merge`;
+  redraw();
+}
+
+/* ---------- rendering ---------- */
 function drawGrid(
   map: L.Map,
   gridLayer: L.LayerGroup,
   tokenLayer: L.LayerGroup,
+  hud: HTMLDivElement,
 ) {
   gridLayer.clearLayers();
   tokenLayer.clearLayers();
 
   const pad = 0.25;
   const view = map.getBounds().pad(pad);
-  const south = view.getSouth();
-  const north = view.getNorth();
-  const west = view.getWest();
-  const east = view.getEast();
+  const iMin = Math.floor((view.getSouth() - ORIGIN.lat) / CELL_DEG);
+  const iMax = Math.floor((view.getNorth() - ORIGIN.lat) / CELL_DEG);
+  const jMin = Math.floor((view.getWest() - ORIGIN.lng) / CELL_DEG);
+  const jMax = Math.floor((view.getEast() - ORIGIN.lng) / CELL_DEG);
 
-  const iMin = Math.floor((south - ORIGIN.lat) / CELL_DEG);
-  const iMax = Math.floor((north - ORIGIN.lat) / CELL_DEG);
-  const jMin = Math.floor((west - ORIGIN.lng) / CELL_DEG);
-  const jMax = Math.floor((east - ORIGIN.lng) / CELL_DEG);
+  const redraw = () => drawGrid(map, gridLayer, tokenLayer, hud);
 
   for (let i = iMin; i <= iMax; i++) {
     for (let j = jMin; j <= jMax; j++) {
       const near = isNear(i, j);
 
-      L.rectangle(cellBounds(i, j), {
+      const rect = L.rectangle(cellBounds(i, j), {
         color: near ? "#2a7a5e" : "#3d30306e",
         weight: near ? 2 : 1,
         fillOpacity: 0,
-        interactive: false,
+        interactive: true,
       }).addTo(gridLayer);
 
-      const v = tokenValue(i, j);
+      rect.on("click", () => onCellClick(i, j, hud, redraw));
+
+      const v = getValue(i, j);
       if (v > 0) {
         L.marker(cellCenter(i, j), {
           icon: L.divIcon({
@@ -100,6 +153,7 @@ function drawGrid(
 
 function init() {
   const container = ensureContainer();
+  const hud = ensureHUD();
 
   const map = L.map(container, { preferCanvas: true }).setView(
     [CENTER.lat, CENTER.lng],
@@ -121,9 +175,11 @@ function init() {
     .addTo(map)
     .bindTooltip("You", { direction: "top", offset: [0, -12] });
 
+  hud.textContent = `Holding: —  •  Click matching nearby values to merge`;
+
   const gridLayer = L.layerGroup().addTo(map);
   const tokenLayer = L.layerGroup().addTo(map);
-  const redraw = () => drawGrid(map, gridLayer, tokenLayer);
+  const redraw = () => drawGrid(map, gridLayer, tokenLayer, hud);
 
   redraw();
   map.on("moveend zoomend resize", redraw);

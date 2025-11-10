@@ -58,3 +58,14 @@ html, body {
 .token-label.token-far {
   opacity: 0.35;
 }
+
+#hud {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 1000;
+}
