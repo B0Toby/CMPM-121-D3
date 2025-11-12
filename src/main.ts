@@ -9,7 +9,6 @@ import luck from "./_luck.ts";
 const CENTER = { lat: 36.997936938057016, lng: -122.05703507501151 };
 const CELL_DEG = 1e-4;
 const ORIGIN = CENTER;
-
 const INTERACT_STEPS = 3; // Chebyshev distance in cells
 
 function ensureContainer(): HTMLElement {
@@ -34,17 +33,23 @@ function ensureHUD(): HTMLDivElement {
   return hud;
 }
 
+/* ---------- grid helpers ---------- */
 function cellBounds(i: number, j: number): L.LatLngBoundsExpression {
   return [
     [ORIGIN.lat + i * CELL_DEG, ORIGIN.lng + j * CELL_DEG],
     [ORIGIN.lat + (i + 1) * CELL_DEG, ORIGIN.lng + (j + 1) * CELL_DEG],
   ];
 }
-
 function cellCenter(i: number, j: number): [number, number] {
   const south = ORIGIN.lat + i * CELL_DEG;
   const west = ORIGIN.lng + j * CELL_DEG;
   return [south + CELL_DEG / 2, west + CELL_DEG / 2];
+}
+function latLngToCell(lat: number, lng: number) {
+  return {
+    i: Math.floor((lat - ORIGIN.lat) / CELL_DEG),
+    j: Math.floor((lng - ORIGIN.lng) / CELL_DEG),
+  };
 }
 
 /* ---------- deterministic token generation ---------- */
@@ -70,9 +75,16 @@ function setValue(i: number, j: number, v: number) {
   modified.set(key(i, j), v);
 }
 
-/* ---------- proximity ---------- */
+/* ---------- player & proximity ---------- */
+const player = { lat: CENTER.lat, lng: CENTER.lng };
+let playerMarker: L.Marker;
+
+function playerCell() {
+  return latLngToCell(player.lat, player.lng);
+}
 function isNear(i: number, j: number): boolean {
-  return Math.max(Math.abs(i), Math.abs(j)) <= INTERACT_STEPS;
+  const p = playerCell();
+  return Math.max(Math.abs(i - p.i), Math.abs(j - p.j)) <= INTERACT_STEPS;
 }
 
 /* ---------- interaction ---------- */
@@ -98,9 +110,7 @@ function onCellClick(
     }
   }
 
-  hud.textContent = `Holding: ${
-    held ?? "—"
-  }  •  Click matching nearby values to merge`;
+  hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD to move`;
   redraw();
 }
 
@@ -171,15 +181,46 @@ function init() {
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
-  L.marker([CENTER.lat, CENTER.lng], { icon: playerIcon })
+  playerMarker = L.marker([player.lat, player.lng], { icon: playerIcon })
     .addTo(map)
     .bindTooltip("You", { direction: "top", offset: [0, -12] });
 
-  hud.textContent = `Holding: —  •  Click matching nearby values to merge`;
+  hud.textContent = `Holding: —  •  Use WASD to move`;
 
   const gridLayer = L.layerGroup().addTo(map);
   const tokenLayer = L.layerGroup().addTo(map);
   const redraw = () => drawGrid(map, gridLayer, tokenLayer, hud);
+
+  /* --- WASD movement: one CELL_DEG per key press --- */
+  const moveBy = (dLat: number, dLng: number) => {
+    player.lat += dLat;
+    player.lng += dLng;
+    playerMarker.setLatLng([player.lat, player.lng]);
+    hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD to move`;
+    map.setView([player.lat, player.lng]); // keep player centered
+    redraw();
+  };
+
+  globalThis.addEventListener("keydown", (e) => {
+    switch (e.key) {
+      case "w":
+      case "ArrowUp":
+        moveBy(CELL_DEG, 0);
+        break;
+      case "s":
+      case "ArrowDown":
+        moveBy(-CELL_DEG, 0);
+        break;
+      case "a":
+      case "ArrowLeft":
+        moveBy(0, -CELL_DEG);
+        break;
+      case "d":
+      case "ArrowRight":
+        moveBy(0, CELL_DEG);
+        break;
+    }
+  });
 
   redraw();
   map.on("moveend zoomend resize", redraw);

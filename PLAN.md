@@ -27,3 +27,4 @@ A location-tinted clicker/crafter: the map is divided into small cells, you harv
 - [x] deterministically decide which cells contain a token
 - [x] restrict interactions to “nearby” cells
 - [x] merge two tokens of the same value into the next tier
+- [x] Add WASD movement (one cell per key press) and make “nearby” checks relative to player
