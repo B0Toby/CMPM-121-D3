@@ -149,8 +149,11 @@ function drawGrid(
 
   const redraw = () => drawGrid(map, gridLayer, tokenLayer, hud);
 
+  const visible = new Set<string>();
+
   for (let i = iMin; i <= iMax; i++) {
     for (let j = jMin; j <= jMax; j++) {
+      visible.add(`${i},${j}`);
       const near = isNear(i, j);
 
       const rect = L.rectangle(cellBounds(i, j), {
@@ -174,6 +177,10 @@ function drawGrid(
         }).addTo(tokenLayer);
       }
     }
+  }
+
+  for (const k of Array.from(modified.keys())) {
+    if (!visible.has(k)) modified.delete(k);
   }
 }
 
