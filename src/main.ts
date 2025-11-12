@@ -8,8 +8,9 @@ import luck from "./_luck.ts";
 
 const CENTER = { lat: 36.997936938057016, lng: -122.05703507501151 };
 const CELL_DEG = 1e-4;
-const ORIGIN = { lat: 0, lng: 0 };
+const ORIGIN = { lat: 0, lng: 0 }; // D3.b: global grid
 const INTERACT_STEPS = 3; // Chebyshev distance in cells
+const WIN_TARGET = 32; // D3.b: higher win threshold
 
 function ensureContainer(): HTMLElement {
   let el = document.getElementById("map") ??
@@ -82,6 +83,7 @@ type Key = string;
 const key = (i: number, j: number) => `${i},${j}`;
 const modified = new Map<Key, number>(); // 0 means emptied by pickup
 let held: number | null = null;
+let hasWon = false;
 
 function getValue(i: number, j: number): number {
   const k = key(i, j);
@@ -103,6 +105,14 @@ function isNear(i: number, j: number): boolean {
   return Math.max(Math.abs(i - p.i), Math.abs(j - p.j)) <= INTERACT_STEPS;
 }
 
+function checkWin(hud: HTMLDivElement) {
+  if (!hasWon && held !== null && held >= WIN_TARGET) {
+    hasWon = true;
+    hud.textContent = `Holding: ${held}  •  You win!`;
+    alert("You win!");
+  }
+}
+
 /* ---------- interaction ---------- */
 function onCellClick(
   i: number,
@@ -116,17 +126,20 @@ function onCellClick(
 
   if (held === null) {
     if (cur > 0) {
-      held = cur; // pick up
-      setValue(i, j, 0); // remove from cell
+      held = cur;
+      setValue(i, j, 0);
+      checkWin(hud);
     }
   } else {
     if (cur === held && cur > 0) {
-      setValue(i, j, held * 2); // merge into the cell
-      held = null; // hand becomes empty
+      setValue(i, j, held * 2);
+      held = null;
     }
   }
 
-  hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD or buttons to move`;
+  if (!hasWon) {
+    hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD or buttons to move`;
+  }
   redraw();
 }
 
@@ -219,7 +232,11 @@ function init() {
     player.lat += dLat;
     player.lng += dLng;
     playerMarker.setLatLng([player.lat, player.lng]);
-    hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD or buttons to move`;
+    if (!hasWon) {
+      hud.textContent = `Holding: ${
+        held ?? "—"
+      }  •  Use WASD or buttons to move`;
+    }
     map.setView([player.lat, player.lng]); // keep centered
     redraw();
   };

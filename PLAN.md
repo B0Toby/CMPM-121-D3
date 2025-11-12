@@ -30,3 +30,4 @@ A location-tinted clicker/crafter: the map is divided into small cells, you harv
 - [x] movement (WASD / Buttons) and make “nearby” checks relative to player
 - [x] null island anchor
 - [x] memoryless cells
+- [x] win condition
