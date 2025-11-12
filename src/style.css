@@ -69,3 +69,44 @@ html, body {
   font-size: 13px;
   z-index: 1000;
 }
+
+#controls {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  grid-template-columns: 48px 48px 48px;
+  grid-template-rows: 48px 48px;
+  gap: 6px;
+  z-index: 1100;
+}
+
+#controls .move-btn {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  font-size: 20px;
+  cursor: pointer;
+  user-select: none;
+}
+#controls .move-btn:active {
+  transform: translateY(1px);
+}
+
+/* arrange like a D-pad */
+#controls .move-btn[data-dir="up"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+#controls .move-btn[data-dir="left"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+#controls .move-btn[data-dir="down"] {
+  grid-column: 2;
+  grid-row: 2;
+}
+#controls .move-btn[data-dir="right"] {
+  grid-column: 3;
+  grid-row: 2;
+}

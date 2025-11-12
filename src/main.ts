@@ -33,6 +33,22 @@ function ensureHUD(): HTMLDivElement {
   return hud;
 }
 
+function ensureControls(): HTMLDivElement {
+  let el = document.getElementById("controls") as HTMLDivElement | null;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "controls";
+    el.innerHTML = `
+      <button class="move-btn" data-dir="up"    aria-label="Move up">▲</button>
+      <button class="move-btn" data-dir="left"  aria-label="Move left">◀</button>
+      <button class="move-btn" data-dir="down"  aria-label="Move down">▼</button>
+      <button class="move-btn" data-dir="right" aria-label="Move right">▶</button>
+    `;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 /* ---------- grid helpers ---------- */
 function cellBounds(i: number, j: number): L.LatLngBoundsExpression {
   return [
@@ -110,7 +126,7 @@ function onCellClick(
     }
   }
 
-  hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD to move`;
+  hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD or buttons to move`;
   redraw();
 }
 
@@ -164,6 +180,7 @@ function drawGrid(
 function init() {
   const container = ensureContainer();
   const hud = ensureHUD();
+  const controls = ensureControls();
 
   const map = L.map(container, { preferCanvas: true }).setView(
     [CENTER.lat, CENTER.lng],
@@ -185,22 +202,22 @@ function init() {
     .addTo(map)
     .bindTooltip("You", { direction: "top", offset: [0, -12] });
 
-  hud.textContent = `Holding: —  •  Use WASD to move`;
+  hud.textContent = `Holding: —  •  Use WASD or buttons to move`;
 
   const gridLayer = L.layerGroup().addTo(map);
   const tokenLayer = L.layerGroup().addTo(map);
   const redraw = () => drawGrid(map, gridLayer, tokenLayer, hud);
 
-  /* --- WASD movement: one CELL_DEG per key press --- */
   const moveBy = (dLat: number, dLng: number) => {
     player.lat += dLat;
     player.lng += dLng;
     playerMarker.setLatLng([player.lat, player.lng]);
-    hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD to move`;
-    map.setView([player.lat, player.lng]); // keep player centered
+    hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD or buttons to move`;
+    map.setView([player.lat, player.lng]); // keep centered
     redraw();
   };
 
+  // WASD / Arrow keys
   globalThis.addEventListener("keydown", (e) => {
     switch (e.key) {
       case "w":
@@ -217,6 +234,25 @@ function init() {
         break;
       case "d":
       case "ArrowRight":
+        moveBy(0, CELL_DEG);
+        break;
+    }
+  });
+
+  controls.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    if (!(t instanceof HTMLButtonElement)) return;
+    switch (t.dataset.dir) {
+      case "up":
+        moveBy(CELL_DEG, 0);
+        break;
+      case "down":
+        moveBy(-CELL_DEG, 0);
+        break;
+      case "left":
+        moveBy(0, -CELL_DEG);
+        break;
+      case "right":
         moveBy(0, CELL_DEG);
         break;
     }
