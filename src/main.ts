@@ -8,7 +8,7 @@ import luck from "./_luck.ts";
 
 const CENTER = { lat: 36.997936938057016, lng: -122.05703507501151 };
 const CELL_DEG = 1e-4;
-const ORIGIN = CENTER;
+const ORIGIN = { lat: 0, lng: 0 };
 const INTERACT_STEPS = 3; // Chebyshev distance in cells
 
 function ensureContainer(): HTMLElement {
