@@ -8,9 +8,9 @@ import luck from "./_luck.ts";
 
 const CENTER = { lat: 36.997936938057016, lng: -122.05703507501151 };
 const CELL_DEG = 1e-4;
-const ORIGIN = { lat: 0, lng: 0 }; // D3.b: global grid
-const INTERACT_STEPS = 3; // Chebyshev distance in cells
-const WIN_TARGET = 32; // D3.b: higher win threshold
+const ORIGIN = { lat: 0, lng: 0 };
+const INTERACT_STEPS = 3;
+const WIN_TARGET = 32;
 
 function ensureContainer(): HTMLElement {
   let el = document.getElementById("map") ??
@@ -57,11 +57,13 @@ function cellBounds(i: number, j: number): L.LatLngBoundsExpression {
     [ORIGIN.lat + (i + 1) * CELL_DEG, ORIGIN.lng + (j + 1) * CELL_DEG],
   ];
 }
+
 function cellCenter(i: number, j: number): [number, number] {
   const south = ORIGIN.lat + i * CELL_DEG;
   const west = ORIGIN.lng + j * CELL_DEG;
   return [south + CELL_DEG / 2, west + CELL_DEG / 2];
 }
+
 function latLngToCell(lat: number, lng: number) {
   return {
     i: Math.floor((lat - ORIGIN.lat) / CELL_DEG),
@@ -78,10 +80,11 @@ function baseToken(i: number, j: number): number {
   return 0;
 }
 
-/* ---------- gameplay state (only store cells that changed) ---------- */
 type Key = string;
 const key = (i: number, j: number) => `${i},${j}`;
-const modified = new Map<Key, number>(); // 0 means emptied by pickup
+
+const modified = new Map<Key, number>();
+
 let held: number | null = null;
 let hasWon = false;
 
@@ -89,6 +92,7 @@ function getValue(i: number, j: number): number {
   const k = key(i, j);
   return modified.has(k) ? modified.get(k)! : baseToken(i, j);
 }
+
 function setValue(i: number, j: number, v: number) {
   modified.set(key(i, j), v);
 }
@@ -100,6 +104,7 @@ let playerMarker: L.Marker;
 function playerCell() {
   return latLngToCell(player.lat, player.lng);
 }
+
 function isNear(i: number, j: number): boolean {
   const p = playerCell();
   return Math.max(Math.abs(i - p.i), Math.abs(j - p.j)) <= INTERACT_STEPS;
@@ -162,11 +167,8 @@ function drawGrid(
 
   const redraw = () => drawGrid(map, gridLayer, tokenLayer, hud);
 
-  const visible = new Set<string>();
-
   for (let i = iMin; i <= iMax; i++) {
     for (let j = jMin; j <= jMax; j++) {
-      visible.add(`${i},${j}`);
       const near = isNear(i, j);
 
       const rect = L.rectangle(cellBounds(i, j), {
@@ -191,12 +193,9 @@ function drawGrid(
       }
     }
   }
-
-  for (const k of Array.from(modified.keys())) {
-    if (!visible.has(k)) modified.delete(k);
-  }
 }
 
+/* ---------- init ---------- */
 function init() {
   const container = ensureContainer();
   const hud = ensureHUD();
@@ -218,6 +217,7 @@ function init() {
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
+
   playerMarker = L.marker([player.lat, player.lng], { icon: playerIcon })
     .addTo(map)
     .bindTooltip("You", { direction: "top", offset: [0, -12] });
