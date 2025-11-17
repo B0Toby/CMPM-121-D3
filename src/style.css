@@ -110,3 +110,27 @@ html, body {
   grid-column: 3;
   grid-row: 2;
 }
+
+/* top-right system controls */
+#system-controls {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  z-index: 1050;
+}
+
+#system-controls button {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+#system-controls button:active {
+  transform: translateY(1px);
+}

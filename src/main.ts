@@ -50,6 +50,19 @@ function ensureControls(): HTMLDivElement {
   return el;
 }
 
+function ensureSystemControls(): HTMLDivElement {
+  let el = document.getElementById("system-controls") as HTMLDivElement | null;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "system-controls";
+    el.innerHTML = `
+      <button id="movement-toggle-btn">Use geolocation</button>
+    `;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 /* ---------- grid helpers ---------- */
 function cellBounds(i: number, j: number): L.LatLngBoundsExpression {
   return [
@@ -93,6 +106,8 @@ interface MovementController {
   start(): void;
   stop(): void;
 }
+
+type MovementMode = "buttons" | "geolocation";
 
 function createButtonMovementController(
   onMoveBy: (dLat: number, dLng: number) => void,
@@ -146,6 +161,39 @@ function createButtonMovementController(
     stop() {
       globalThis.removeEventListener("keydown", handleKeyDown);
       controls.removeEventListener("click", handleClick);
+    },
+  };
+}
+
+function createGeolocationMovementController(
+  onMoveTo: (lat: number, lng: number) => void,
+): MovementController {
+  let watchId: number | null = null;
+
+  return {
+    start() {
+      if (!("geolocation" in navigator)) {
+        alert("Geolocation is not supported in this browser.");
+        return;
+      }
+      if (watchId !== null) return;
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          onMoveTo(latitude, longitude);
+        },
+        (err) => {
+          console.error("Geolocation error:", err);
+        },
+        { enableHighAccuracy: true },
+      );
+    },
+    stop() {
+      if (watchId !== null && "geolocation" in navigator) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
     },
   };
 }
@@ -206,7 +254,7 @@ function onCellClick(
   }
 
   if (!hasWon) {
-    hud.textContent = `Holding: ${held ?? "—"}  •  Use WASD or buttons to move`;
+    hud.textContent = `Holding: ${held ?? "—"}  •  Move with buttons or device`;
   }
   redraw();
 }
@@ -263,6 +311,10 @@ function init() {
   const container = ensureContainer();
   const hud = ensureHUD();
   const controls = ensureControls();
+  const systemControls = ensureSystemControls();
+  const movementToggleBtn = systemControls.querySelector(
+    "#movement-toggle-btn",
+  ) as HTMLButtonElement;
 
   const map = L.map(container, { preferCanvas: true }).setView(
     [CENTER.lat, CENTER.lng],
@@ -285,27 +337,65 @@ function init() {
     .addTo(map)
     .bindTooltip("You", { direction: "top", offset: [0, -12] });
 
-  hud.textContent = `Holding: —  •  Use WASD or buttons to move`;
+  hud.textContent = `Holding: —  •  Move with buttons or device`;
 
   const gridLayer = L.layerGroup().addTo(map);
   const tokenLayer = L.layerGroup().addTo(map);
   const redraw = () => drawGrid(map, gridLayer, tokenLayer, hud);
 
-  const moveBy = (dLat: number, dLng: number) => {
-    player.lat += dLat;
-    player.lng += dLng;
+  const applyPlayerPosition = (lat: number, lng: number) => {
+    player.lat = lat;
+    player.lng = lng;
     playerMarker.setLatLng([player.lat, player.lng]);
     if (!hasWon) {
       hud.textContent = `Holding: ${
         held ?? "—"
-      }  •  Use WASD or buttons to move`;
+      }  •  Move with buttons or device`;
     }
-    map.setView([player.lat, player.lng]); // keep centered
+    map.setView([player.lat, player.lng]);
     redraw();
   };
 
+  const moveBy = (dLat: number, dLng: number) => {
+    applyPlayerPosition(player.lat + dLat, player.lng + dLng);
+  };
+
   const buttonMovement = createButtonMovementController(moveBy, controls);
-  buttonMovement.start();
+  const geoMovement = createGeolocationMovementController(
+    (lat, lng) => applyPlayerPosition(lat, lng),
+  );
+
+  let currentMode: MovementMode = "buttons";
+  let currentController: MovementController | null = null;
+
+  const updateMovementToggleLabel = () => {
+    movementToggleBtn.textContent = currentMode === "buttons"
+      ? "Use geolocation"
+      : "Use buttons";
+  };
+
+  const setMovementMode = (mode: MovementMode) => {
+    if (mode === currentMode && currentController !== null) return;
+    currentController?.stop();
+    currentMode = mode;
+    currentController = mode === "buttons" ? buttonMovement : geoMovement;
+    currentController.start();
+    updateMovementToggleLabel();
+  };
+
+  const params = new URLSearchParams(globalThis.location.search);
+  const initialMode: MovementMode = params.get("movement") === "geolocation"
+    ? "geolocation"
+    : "buttons";
+
+  setMovementMode(initialMode);
+
+  movementToggleBtn.addEventListener("click", () => {
+    const next: MovementMode = currentMode === "buttons"
+      ? "geolocation"
+      : "buttons";
+    setMovementMode(next);
+  });
 
   redraw();
   map.on("moveend zoomend resize", redraw);
