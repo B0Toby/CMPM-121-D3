@@ -88,6 +88,69 @@ const modified = new Map<Key, number>();
 let held: number | null = null;
 let hasWon = false;
 
+/* ---------- movement facade ---------- */
+interface MovementController {
+  start(): void;
+  stop(): void;
+}
+
+function createButtonMovementController(
+  onMoveBy: (dLat: number, dLng: number) => void,
+  controls: HTMLDivElement,
+): MovementController {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    switch (e.key) {
+      case "w":
+      case "ArrowUp":
+        onMoveBy(CELL_DEG, 0);
+        break;
+      case "s":
+      case "ArrowDown":
+        onMoveBy(-CELL_DEG, 0);
+        break;
+      case "a":
+      case "ArrowLeft":
+        onMoveBy(0, -CELL_DEG);
+        break;
+      case "d":
+      case "ArrowRight":
+        onMoveBy(0, CELL_DEG);
+        break;
+    }
+  };
+
+  const handleClick = (e: MouseEvent) => {
+    const t = e.target as HTMLElement;
+    if (!(t instanceof HTMLButtonElement)) return;
+    switch (t.dataset.dir) {
+      case "up":
+        onMoveBy(CELL_DEG, 0);
+        break;
+      case "down":
+        onMoveBy(-CELL_DEG, 0);
+        break;
+      case "left":
+        onMoveBy(0, -CELL_DEG);
+        break;
+      case "right":
+        onMoveBy(0, CELL_DEG);
+        break;
+    }
+  };
+
+  return {
+    start() {
+      globalThis.addEventListener("keydown", handleKeyDown);
+      controls.addEventListener("click", handleClick);
+    },
+    stop() {
+      globalThis.removeEventListener("keydown", handleKeyDown);
+      controls.removeEventListener("click", handleClick);
+    },
+  };
+}
+
+/* ---------- value helpers ---------- */
 function getValue(i: number, j: number): number {
   const k = key(i, j);
   return modified.has(k) ? modified.get(k)! : baseToken(i, j);
@@ -241,46 +304,8 @@ function init() {
     redraw();
   };
 
-  // WASD / Arrow keys
-  globalThis.addEventListener("keydown", (e) => {
-    switch (e.key) {
-      case "w":
-      case "ArrowUp":
-        moveBy(CELL_DEG, 0);
-        break;
-      case "s":
-      case "ArrowDown":
-        moveBy(-CELL_DEG, 0);
-        break;
-      case "a":
-      case "ArrowLeft":
-        moveBy(0, -CELL_DEG);
-        break;
-      case "d":
-      case "ArrowRight":
-        moveBy(0, CELL_DEG);
-        break;
-    }
-  });
-
-  controls.addEventListener("click", (e) => {
-    const t = e.target as HTMLElement;
-    if (!(t instanceof HTMLButtonElement)) return;
-    switch (t.dataset.dir) {
-      case "up":
-        moveBy(CELL_DEG, 0);
-        break;
-      case "down":
-        moveBy(-CELL_DEG, 0);
-        break;
-      case "left":
-        moveBy(0, -CELL_DEG);
-        break;
-      case "right":
-        moveBy(0, CELL_DEG);
-        break;
-    }
-  });
+  const buttonMovement = createButtonMovementController(moveBy, controls);
+  buttonMovement.start();
 
   redraw();
   map.on("moveend zoomend resize", redraw);
