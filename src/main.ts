@@ -277,7 +277,6 @@ function onCellClick(
   if (!isNear(i, j)) return;
 
   const cur = getValue(i, j);
-
   let changed = false;
 
   if (held === null) {
@@ -292,11 +291,17 @@ function onCellClick(
       setValue(i, j, held * 2);
       held = null;
       changed = true;
+    } else if (cur === 0) {
+      setValue(i, j, held);
+      held = null;
+      changed = true;
     }
   }
 
   if (!hasWon) {
-    hud.textContent = `Holding: ${held ?? "—"}  •  Move with buttons or device`;
+    hud.textContent = `Holding: ${
+      held ?? "—"
+    }  •  Pick up, drop, or merge matching tokens`;
   }
 
   if (changed) {

@@ -56,7 +56,8 @@ A location-tinted clicker/crafter: the map is divided into small cells, you harv
 
 #### Steps d
 
-- [x] Introduce movement controller interface (Facade) and migrate button/WASD controls to it
-- [x] Add geolocation-based movement controller and runtime toggle between buttons and geolocation
-- [x] Persist game state across sessions using localStorage (player position, held token, modified cells, win state)
-- [x] Add “New Game” flow and do a small cleanup-only pass, then mark D3.d complete
+- [x] introduce movement controller interface (Facade) and migrate button/WASD controls to it
+- [x] add geolocation-based movement controller and runtime toggle between buttons and geolocation
+- [x] persist game state across sessions using localStorage (player position, held token, modified cells, win state)
+- [x] add “New Game” flow and do a small cleanup-only pass, then mark D3.d complete
+- [x] allow dropping held tokens onto empty nearby cells
