@@ -11,6 +11,7 @@ const CELL_DEG = 1e-4;
 const ORIGIN = { lat: 0, lng: 0 };
 const INTERACT_STEPS = 3;
 const WIN_TARGET = 32;
+const STORAGE_KEY = "world-of-bits-state";
 
 function ensureContainer(): HTMLElement {
   let el = document.getElementById("map") ??
@@ -56,6 +57,7 @@ function ensureSystemControls(): HTMLDivElement {
     el = document.createElement("div");
     el.id = "system-controls";
     el.innerHTML = `
+      <button id="new-game-btn">New game</button>
       <button id="movement-toggle-btn">Use geolocation</button>
     `;
     document.body.appendChild(el);
@@ -100,6 +102,41 @@ const modified = new Map<Key, number>();
 
 let held: number | null = null;
 let hasWon = false;
+
+/* ---------- persistence ---------- */
+interface StoredState {
+  player: { lat: number; lng: number };
+  held: number | null;
+  hasWon: boolean;
+  modifiedEntries: [Key, number][];
+}
+
+function saveState(player: { lat: number; lng: number }) {
+  try {
+    if (!("localStorage" in globalThis)) return;
+    const state: StoredState = {
+      player: { lat: player.lat, lng: player.lng },
+      held,
+      hasWon,
+      modifiedEntries: Array.from(modified.entries()),
+    };
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.error("Failed to save state:", err);
+  }
+}
+
+function loadState(): StoredState | null {
+  try {
+    if (!("localStorage" in globalThis)) return null;
+    const raw = globalThis.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StoredState;
+  } catch (err) {
+    console.error("Failed to load state:", err);
+    return null;
+  }
+}
 
 /* ---------- movement facade ---------- */
 interface MovementController {
@@ -225,6 +262,7 @@ function checkWin(hud: HTMLDivElement) {
   if (!hasWon && held !== null && held >= WIN_TARGET) {
     hasWon = true;
     hud.textContent = `Holding: ${held}  •  You win!`;
+    saveState(player);
     alert("You win!");
   }
 }
@@ -240,22 +278,31 @@ function onCellClick(
 
   const cur = getValue(i, j);
 
+  let changed = false;
+
   if (held === null) {
     if (cur > 0) {
       held = cur;
       setValue(i, j, 0);
+      changed = true;
       checkWin(hud);
     }
   } else {
     if (cur === held && cur > 0) {
       setValue(i, j, held * 2);
       held = null;
+      changed = true;
     }
   }
 
   if (!hasWon) {
     hud.textContent = `Holding: ${held ?? "—"}  •  Move with buttons or device`;
   }
+
+  if (changed) {
+    saveState(player);
+  }
+
   redraw();
 }
 
@@ -306,18 +353,62 @@ function drawGrid(
   }
 }
 
+/* ---------- new game ---------- */
+function startNewGame(
+  hud: HTMLDivElement,
+  map: L.Map,
+  redraw: () => void,
+) {
+  const ok = globalThis.confirm(
+    "Start a new game? This will erase your current progress.",
+  );
+  if (!ok) return;
+
+  modified.clear();
+  held = null;
+  hasWon = false;
+
+  try {
+    if ("localStorage" in globalThis) {
+      globalThis.localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch (err) {
+    console.error("Failed to clear saved state:", err);
+  }
+
+  hud.textContent = "Holding: —  •  Move with buttons or device";
+  map.setView([player.lat, player.lng]);
+  redraw();
+}
+
 /* ---------- init ---------- */
 function init() {
   const container = ensureContainer();
   const hud = ensureHUD();
   const controls = ensureControls();
   const systemControls = ensureSystemControls();
+  const newGameBtn = systemControls.querySelector(
+    "#new-game-btn",
+  ) as HTMLButtonElement | null;
   const movementToggleBtn = systemControls.querySelector(
     "#movement-toggle-btn",
   ) as HTMLButtonElement;
 
+  // Load saved state before creating map/marker so player position + cells match.
+  const saved = loadState();
+  if (saved) {
+    player.lat = saved.player.lat;
+    player.lng = saved.player.lng;
+    held = saved.held;
+    hasWon = saved.hasWon;
+    modified.clear();
+    for (const [k, v] of saved.modifiedEntries) {
+      modified.set(k, v);
+    }
+  }
+
   const map = L.map(container, { preferCanvas: true }).setView(
-    [CENTER.lat, CENTER.lng],
+    [player.lat, player.lng],
     19,
   );
 
@@ -337,7 +428,11 @@ function init() {
     .addTo(map)
     .bindTooltip("You", { direction: "top", offset: [0, -12] });
 
-  hud.textContent = `Holding: —  •  Move with buttons or device`;
+  if (hasWon && held !== null) {
+    hud.textContent = `Holding: ${held}  •  You win!`;
+  } else {
+    hud.textContent = `Holding: ${held ?? "—"}  •  Move with buttons or device`;
+  }
 
   const gridLayer = L.layerGroup().addTo(map);
   const tokenLayer = L.layerGroup().addTo(map);
@@ -353,6 +448,7 @@ function init() {
       }  •  Move with buttons or device`;
     }
     map.setView([player.lat, player.lng]);
+    saveState(player);
     redraw();
   };
 
@@ -396,6 +492,12 @@ function init() {
       : "buttons";
     setMovementMode(next);
   });
+
+  if (newGameBtn) {
+    newGameBtn.addEventListener("click", () => {
+      startNewGame(hud, map, redraw);
+    });
+  }
 
   redraw();
   map.on("moveend zoomend resize", redraw);
